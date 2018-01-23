@@ -1,0 +1,31 @@
+% This is a C major scale
+
+#keysig cM
+#timesig 4/4
+
+c4_4( b_3 c_4 d)
+24    1   2   3
+
+e( f  g a)
+4  13 2 3
+
+b( c_5 d e)
+_
+
+f( g a b)
+_
+
+c_6( b_5 a g)
+_
+
+f( e d c)
+_
+
+b_4( a g f)
+_
+
+e( d c b_3)
+_
+
+c1_4
+_
