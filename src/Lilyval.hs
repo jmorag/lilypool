@@ -2,17 +2,18 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 
-module LilyVal (
+module Lilyval (
     PitchClass(..),
     Articulation(..)
 ) where
 
 
-import           Data.Typeable (typeable)
+import           Data.Typeable (Typeable)
 import qualified Data.Text as T
 import qualified Data.Map as Map
 import           Control.Exception
 import           Control.Monad.Reader
+import           Prelude hiding (String)
 
 
 data PitchClass = C | Dff | Btqs | Cqs | Dtqf | Bss | Cs | Df | Ctqs 
@@ -23,25 +24,43 @@ data PitchClass = C | Dff | Btqs | Cqs | Dtqf | Bss | Cs | Df | Ctqs
                 | Gss | A | Bff | Aqs | Btqf | As | Bf | Cff | Atqs | Bqf 
                 | Ctqf | Ass | B | Cf | Bqs | Cqf | Bs
 
-data Articulation = (!) | (-) | (.) | (>) | (+) | (^) 
+-- ! . ^ > - -. +
+data Articulation = Staccatissimo | Staccato | VAccent | Accent 
+                    | Tenuto | Portato | LHPizz | None
 
 type Dur = Rational
 type Octave = Int
 
 -- E | A | D | G for violin, but general for all strings
-data String = One | Two | Three | Four 
-type Harmonic = Bool
+data String = I | II | III | IV 
 data Finger = Open | One | Two | Three | Four
+type Harmonic = Bool
 
 data Tempo = Tempo Dur Int
 data Fingering = Fingering Finger Harmonic String
 
-data Note = Note { pitch  :: PitchClass
+data Primitive = Note { pitch  :: PitchClass
                  , dur    :: Dur
                  , oct    :: Octave
-                 , art    :: Maybe Articulation
+                 , art    :: Articulation
                  , tempo  :: Tempo
-                 , finger :: Fingering
+                 , finger :: Maybe Fingering
+                 , grace  :: Bool
+                 } | 
+            Rest { dur :: Dur
+                 , tempo :: Tempo
+                 , grace  :: Bool
                  }
 
--- TODO chords and slurs and polyphony
+data Music = Prim Primitive  |
+             Music :+: Music | -- notes under a slur
+             Music :=: Music | -- notes in a chord
+             Passage [Music]   -- a passage 
+-- (possibly consider using Sequence instead of List for passage)
+
+
+-- Speical annotations
+data Quality = Major | Minor
+data Key     = Key PitchClass Quality
+type Time    = Rational
+
