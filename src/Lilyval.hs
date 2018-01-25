@@ -2,10 +2,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 
-module Lilyval (
-    PitchClass(..),
-    Articulation(..)
-) where
+module Lilyval where
 
 
 import           Data.Typeable (Typeable)
@@ -55,9 +52,9 @@ data Primitive = Note { pitch  :: PitchClass
 data Music = Prim Primitive  |
              Music :+: Music | -- notes under a slur
              Music :=: Music | -- notes in a chord
-             Passage [Music]   -- a passage 
+             Passage [Music] | -- a passage 
+             Polyphony [[Music]] -- arbitrary polyphony
 -- (possibly consider using Sequence instead of List for passage)
-
 
 -- Speical annotations
 data Quality = Major | Minor
