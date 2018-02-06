@@ -47,7 +47,8 @@ data Primitive = Note { pitch  :: PitchClass
             Rest { dur :: Dur
                  , tempo :: Tempo
                  , grace  :: Bool
-                 }
+                 } -- it is possible that the compiler will complain 
+                 -- about records with the same names
 
 data Music = Prim Primitive  |
              Music :+: Music | -- notes under a slur
@@ -56,8 +57,9 @@ data Music = Prim Primitive  |
              Polyphony [[Music]] -- arbitrary polyphony
 -- (possibly consider using Sequence instead of List for passage)
 
+
 -- Speical annotations
 data Quality = Major | Minor
 data Key     = Key PitchClass Quality
-type Time    = Rational
+data Time    = Time Rational
 
