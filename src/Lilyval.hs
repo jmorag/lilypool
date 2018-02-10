@@ -11,6 +11,7 @@ import qualified Data.Map as Map
 import           Control.Exception
 import           Control.Monad.Reader
 import           Prelude hiding (String)
+import           Data.Ratio (Ratio)
 
 
 -- data PitchClass = C | Dff | Btqs | Cqs | Dtqf | Bss | Cs | Df | Ctqs 
@@ -23,28 +24,32 @@ import           Prelude hiding (String)
 
 -- This is less disgusting than the above
 data BaseNote = A | B | C | D | E | F | G 
-    deriving Enum
+    deriving (Enum, Show)
 
-data Accidental = DoubleFlat | TQFlat | Flat | QFlat 
+data Accidental = DoubleFlat | TQFlat | Flat | QFlat | Natural
                 | QSharp | Sharp | TQSharp | DoubleSharp
-    deriving Enum
+    deriving (Enum, Show)
 
 data PitchClass = PitchClass BaseNote Accidental
+    deriving Show
 
 -- ! . ^ > - -. +
 data Articulation = Staccatissimo | Staccato | VAccent | Accent 
                     | Tenuto | Portato | LHPizz | None
+    deriving Show
 
-type Dur = Rational
+type Dur = Ratio Int
 type Octave = Int
 
 -- E | A | D | G for violin, but general for all strings
 data String = I | II | III | IV 
+    deriving Show
 data Finger = Open | One | Two | Three | Four
+    deriving Show
 type Harmonic = Bool
 
-data Tempo = Tempo Dur Int
 data Fingering = Fingering Finger Harmonic String
+    deriving Show
 
 data Primitive = Note { pitch  :: PitchClass
                  , dur    :: Dur
@@ -59,17 +64,24 @@ data Primitive = Note { pitch  :: PitchClass
                  , grace  :: Bool
                  } -- it is possible that the compiler will complain 
                  -- about records with the same names
+    deriving Show
 
 data Music = Prim Primitive  |
              Music :+: Music | -- notes under a slur
              Music :=: Music | -- notes in a chord
              Passage [Music] | -- a passage 
              Polyphony [[Music]] -- arbitrary polyphony
+    deriving Show
 -- (possibly consider using Sequence instead of List for passage)
 
 
 -- Speical annotations
 data Quality = Major | Minor
+    deriving Show
 data Key     = Key PitchClass Quality
-data Time    = Time Rational
+    deriving Show
+data Time    = Time Int Int
+    deriving Show
+data Tempo   = Tempo Dur Int
+    deriving Show
 

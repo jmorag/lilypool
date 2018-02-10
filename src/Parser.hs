@@ -1,4 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 module Parser where
 
@@ -7,15 +9,20 @@ import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import           Data.Text (Text)
 import qualified Data.Text as T
-import Control.Monad (void, foldM)
+import Control.Monad (void)
 import Data.Void
+import           Data.Typeable (Typeable)
+import           Data.Data (Data)
 
 import           Data.Array (listArray, (!))
 import           Data.Maybe (fromMaybe)
+import           Data.Ratio ((%))
+import qualified Data.Bits as Bits
+import qualified Data.Set as S
 
 import Lilyval
 
-type Parser = Parsec Void Text
+type Parser = Parsec CustomError Text
 
 {- 
  - Many examples taken from 
@@ -45,8 +52,7 @@ keyP = do
     symbol "#key"
     pitchClass <- pitchClassP
     quality <- qualityP
-    spaceConsumer
-    eol
+    spaceConsumer >> eol
     return $ Key pitchClass quality
 
 qualityP :: Parser Quality
@@ -59,20 +65,49 @@ qualityP = do
 timeP :: Parser Time
 timeP = do
     symbol "#time"
-    -- verify at parse time that the rational has a denominator that is a power
-    -- of two
-    numerator <- L.decimal
+    numerator <- L.decimal :: Parser Int
     char '/'
-    denominator <- L.decimal
-    if isNotPowerofTwo denominator then error "Denominator not power of two" else
-        return $ Time (numerator % denominator)
+    -- We only accept powers of two as denominators
+    denominator <- powerOfTwoP
+    eol
+    return $ Time numerator denominator
+
+tempoP :: Parser Tempo
+tempoP = do 
+    symbol "#tempo"
+    noteLength <- rhythmP
+    spaceConsumer
+    symbol "="
+    bpm <- L.decimal :: Parser Int
+    spaceConsumer >> eol
+    return $ Tempo noteLength bpm
+
+rhythmP :: Parser Dur
+rhythmP = do
+    baseLength <- powerOfTwoP
+    isDotted <- observing $ string ","
+    return $ case isDotted of
+        Left _ -> (1 % baseLength)
+        Right "," -> (3 % (baseLength * 2))
+
+
+
+-- Often, we need to parse a number, but make sure that it is a power of two
+numP :: Parser Int
+numP = do
+    num <- L.decimal
+    if num < 0 then errorHelper "Expecting natural number only"
+    else return num
+
+powerOfTwoP :: Parser Int
+powerOfTwoP = do
+    num <- L.decimal
+    if not $ isPowerofTwo num then errorHelper "Expecting a power of two"
+    --ErrorCustom "Denominator not power of two" 
+    else return num
     where
-        isNotPowerofTwo n = logBase 2.0 (fromIntegral denominator)
-
-    
-
-
-tempoP = symbol "#tempo"
+        isPowerofTwo n = Bits.countLeadingZeros n + Bits.countTrailingZeros n 
+                         == Bits.finiteBitSize n - 1
 
 
 -- Parse a pitchclass
@@ -94,17 +129,29 @@ baseNoteP = do
 
 accidentalP :: Parser Accidental
 accidentalP = do
-    let accidentalStrs = ["ff", "tqf", "f", "qf", "qs", "s", "tqs", "ss"]
+    let accidentalStrs = ["ff", "tqf", "f", "qf", "", "qs", "s", "tqs", "ss"]
     accidentalName <- 
         -- there has to be a way to do something like this fold, but 
         -- for now, we can be satisfied with this amount of redundant typing
         -- foldr ((<|>)) $ map string accidentalStrs
         string "ff"  <|> string "tqf" <|>
-        string "f"   <|> string "qf"  <|>
+        string "f"   <|> string "qf"  <|> 
         string "qs"  <|> string "s"   <|>
-        string "tqs" <|> string "ss"
+        string "tqs" <|> string "ss"  <|> string "" 
+        -- natural has to go at the end because it always succeeds
+
     let accidentalMap = zip accidentalStrs [DoubleFlat .. DoubleSharp]
         -- the accidentalName parser would fail before this partial match would
         Just accidental = lookup accidentalName accidentalMap
     return accidental
 
+
+data CustomError = CustomError Text
+    deriving (Eq, Data, Typeable, Ord, Read, Show)
+
+instance ShowErrorComponent CustomError where
+    showErrorComponent (CustomError msg) = 
+        "error: " ++ T.unpack msg
+
+errorHelper :: Text -> Parser a
+errorHelper = fancyFailure . S.singleton . ErrorCustom . CustomError
