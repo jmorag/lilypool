@@ -15,20 +15,27 @@ import Parser
 
 main :: IO ()
 main = do
-  parseTest keyP keyTest1
-  parseTest keyP keyTest2
-  parseTest keyP keyTest3
-  -- parseTest keyP keyTest4
-  parseTest timeP timeTest1
-  parseTest timeP timeTest2
-  -- parseTest timeP timeTest3
-  -- parseTest timeP timeTest4
-  parseTest tempoP tempoTest1
-  parseTest tempoP tempoTest2
-  parseTest tempoP tempoTest3
-  parseTest tempoP tempoTest4
+
+  -- parseTest keyP keyTest1
+  -- parseTest keyP keyTest2
+  -- parseTest keyP keyTest3
+  -- -- parseTest keyP keyTest4
+  -- parseTest timeP timeTest1
+  -- parseTest timeP timeTest2
+  -- -- parseTest timeP timeTest3
+  -- -- parseTest timeP timeTest4
+  -- parseTest tempoP tempoTest1
+  -- parseTest tempoP tempoTest2
+  -- parseTest tempoP tempoTest3
+  -- parseTest tempoP tempoTest4
+  
+  -- parseTest noteP "c4_4"
+  parseTest lP ""
+  return ()
 
 
+
+lookaheadtest = ","
 keyTest1 = "#key am\n"
 keyTest2 = "#key cM\n"
 keyTest3 = "#key dsm\n"

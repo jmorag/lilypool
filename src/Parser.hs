@@ -28,6 +28,16 @@ type Parser = Parsec CustomError Text
  - Many examples taken from 
  - https://markkarpov.com/megaparsec/parsing-simple-imperative-language.html
  -}
+-- Define custom error type
+data CustomError = CustomError Text
+    deriving (Eq, Data, Typeable, Ord, Read, Show)
+
+instance ShowErrorComponent CustomError where
+    showErrorComponent (CustomError msg) = 
+        "error: " ++ T.unpack msg
+
+errorHelper :: Text -> Parser a
+errorHelper = fancyFailure . S.singleton . ErrorCustom . CustomError
 
 -- define space consumer
 spaceConsumer :: Parser ()
@@ -46,6 +56,23 @@ lexeme = L.lexeme spaceConsumer
 symbol :: Text -> Parser Text 
 symbol = L.symbol spaceConsumer
 
+numP :: Parser Int
+numP = do
+    num <- L.decimal
+    if num < 0 then errorHelper "Expecting natural number only"
+    else return num
+
+-- Often, we need to parse a number, but make sure that it is a power of two
+powerOfTwoP :: Parser Int
+powerOfTwoP = do
+    num <- numP
+    if not $ isPowerofTwo num then errorHelper "Expecting a power of two"
+    else return num
+    where
+        isPowerofTwo n = Bits.countLeadingZeros n + Bits.countTrailingZeros n 
+                         == Bits.finiteBitSize n - 1
+
+{- Begin music parsing -}
 -- Parse the reserved time, key, and tempo symbols
 keyP :: Parser Key
 keyP = do 
@@ -65,7 +92,7 @@ qualityP = do
 timeP :: Parser Time
 timeP = do
     symbol "#time"
-    numerator <- L.decimal :: Parser Int
+    numerator <- numP
     char '/'
     -- We only accept powers of two as denominators
     denominator <- powerOfTwoP
@@ -78,37 +105,17 @@ tempoP = do
     noteLength <- rhythmP
     spaceConsumer
     symbol "="
-    bpm <- L.decimal :: Parser Int
+    bpm <- numP
     spaceConsumer >> eol
     return $ Tempo noteLength bpm
 
 rhythmP :: Parser Dur
 rhythmP = do
     baseLength <- powerOfTwoP
-    isDotted <- observing $ string ","
+    isDotted <- takeWhileP Nothing ( (==) ',')
     return $ case isDotted of
-        Left _ -> (1 % baseLength)
-        Right "," -> (3 % (baseLength * 2))
-
-
-
--- Often, we need to parse a number, but make sure that it is a power of two
-numP :: Parser Int
-numP = do
-    num <- L.decimal
-    if num < 0 then errorHelper "Expecting natural number only"
-    else return num
-
-powerOfTwoP :: Parser Int
-powerOfTwoP = do
-    num <- L.decimal
-    if not $ isPowerofTwo num then errorHelper "Expecting a power of two"
-    --ErrorCustom "Denominator not power of two" 
-    else return num
-    where
-        isPowerofTwo n = Bits.countLeadingZeros n + Bits.countTrailingZeros n 
-                         == Bits.finiteBitSize n - 1
-
+        "" -> (1 % baseLength)
+        "," -> (3 % (baseLength * 2))
 
 -- Parse a pitchclass
 pitchClassP :: Parser PitchClass
@@ -145,13 +152,26 @@ accidentalP = do
         Just accidental = lookup accidentalName accidentalMap
     return accidental
 
+octaveP :: Parser Octave
+octaveP = do
+    string "_"
+    oct <- numP
+    return oct
 
-data CustomError = CustomError Text
-    deriving (Eq, Data, Typeable, Ord, Read, Show)
+-- noteP :: Parser Primitive
+-- noteP = do
+--     pitchClass <- pitchClassP
+--     -- for rhythm and octave we need to implemene some kind of state that
+--     -- carries these qualities around
+--     rhythm <- observing rhythmP
+--     oct <- observing octaveP
+--     artic <- observing articulationP
+--     return $ Note pitchclass 
 
-instance ShowErrorComponent CustomError where
-    showErrorComponent (CustomError msg) = 
-        "error: " ++ T.unpack msg
-
-errorHelper :: Text -> Parser a
-errorHelper = fancyFailure . S.singleton . ErrorCustom . CustomError
+-- Trying to understand the takeP parsers    
+-- lP :: Parser Text
+-- lP = do
+--    -- res <- takeWhileP Nothing (\c -> c == '_') 
+--    -- return res
+--    res <- try (takeP Nothing 2) >>= takeP Nothing 1
+--    return res

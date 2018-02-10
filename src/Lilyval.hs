@@ -54,7 +54,7 @@ data Fingering = Fingering Finger Harmonic String
 data Primitive = Note { pitch  :: PitchClass
                  , dur    :: Dur
                  , oct    :: Octave
-                 , art    :: Articulation
+                 , art    :: [Articulation]
                  , tempo  :: Tempo
                  , finger :: Maybe Fingering
                  , grace  :: Bool
@@ -80,6 +80,7 @@ data Quality = Major | Minor
     deriving Show
 data Key     = Key PitchClass Quality
     deriving Show
+-- Time signatures can't be ratios since then they'll be reduced
 data Time    = Time Int Int
     deriving Show
 data Tempo   = Tempo Dur Int
