@@ -24,13 +24,13 @@ main = do
   -- parseTest timeP timeTest2
   -- -- parseTest timeP timeTest3
   -- -- parseTest timeP timeTest4
-  -- parseTest tempoP tempoTest1
-  -- parseTest tempoP tempoTest2
-  -- parseTest tempoP tempoTest3
-  -- parseTest tempoP tempoTest4
+  parseTest tempoP tempoTest1
+  parseTest tempoP tempoTest2
+  parseTest tempoP tempoTest3
+  parseTest tempoP tempoTest4
   
   -- parseTest noteP "c4_4"
-  parseTest lP ""
+  -- parseTest lP ""
   return ()
 
 
@@ -46,9 +46,9 @@ timeTest2 = "#time 3/8\n"
 timeTest3 = "#time 4/5\n"
 timeTest4 = "time 4/4\n"
 
-tempoTest1 = "#tempo 4=60\n"
+tempoTest1 = "#tempo 4,=60\n"
 tempoTest2 = "#tempo 8=200\n"
-tempoTest3 = "#tempo 1=12\n"
+tempoTest3 = "#tempo 16=12\n"
 tempoTest4 = "#tempo 2 = 80\n"
 
 

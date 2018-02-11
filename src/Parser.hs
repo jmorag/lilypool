@@ -4,17 +4,15 @@
 
 module Parser where
 
-import Text.Megaparsec
-import Text.Megaparsec.Char
+import           Text.Megaparsec
+import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import           Data.Text (Text)
 import qualified Data.Text as T
-import Control.Monad (void)
-import Data.Void
+import           Control.Monad (void)
+import           Data.Void
 import           Data.Typeable (Typeable)
 import           Data.Data (Data)
-
-import           Data.Array (listArray, (!))
 import           Data.Maybe (fromMaybe)
 import           Data.Ratio ((%))
 import qualified Data.Bits as Bits
@@ -83,11 +81,7 @@ keyP = do
     return $ Key pitchClass quality
 
 qualityP :: Parser Quality
-qualityP = do
-    qualityName <- char' 'm'
-    case qualityName of
-        'm' -> return Minor
-        'M' -> return Major
+qualityP = (char 'm' >> return Minor) <|> (char 'M' >> return Major)
 
 timeP :: Parser Time
 timeP = do
@@ -112,66 +106,53 @@ tempoP = do
 rhythmP :: Parser Dur
 rhythmP = do
     baseLength <- powerOfTwoP
-    isDotted <- takeWhileP Nothing ( (==) ',')
+    isDotted <- optional (char ',')
     return $ case isDotted of
-        "" -> (1 % baseLength)
-        "," -> (3 % (baseLength * 2))
+        Nothing -> (1 % baseLength)
+        Just ',' -> (3 % (baseLength * 2))
 
--- Parse a pitchclass
 pitchClassP :: Parser PitchClass
 pitchClassP = do
     baseNote <- baseNoteP
     accidental <- accidentalP
     return $ PitchClass baseNote accidental
 
-
--- baseNoteP and accidentalP use arrays and maps, respectively as lookup tables
--- we should just pick one and stick with it
 baseNoteP :: Parser BaseNote
-baseNoteP = do
-    noteName <- satisfy (\c -> c `elem` ['a'..'g']) 
-    let noteMap = listArray ('a', 'g') [A .. G]
-    return $ noteMap ! noteName
-    
+baseNoteP =
+    (string "a" >> return A) <|>
+    (string "b" >> return B) <|>
+    (string "c" >> return C) <|>
+    (string "d" >> return D) <|>
+    (string "e" >> return E) <|>
+    (string "f" >> return F) <|>
+    (string "g" >> return G)
 
 accidentalP :: Parser Accidental
-accidentalP = do
-    let accidentalStrs = ["ff", "tqf", "f", "qf", "", "qs", "s", "tqs", "ss"]
-    accidentalName <- 
-        -- there has to be a way to do something like this fold, but 
-        -- for now, we can be satisfied with this amount of redundant typing
-        -- foldr ((<|>)) $ map string accidentalStrs
-        string "ff"  <|> string "tqf" <|>
-        string "f"   <|> string "qf"  <|> 
-        string "qs"  <|> string "s"   <|>
-        string "tqs" <|> string "ss"  <|> string "" 
-        -- natural has to go at the end because it always succeeds
+accidentalP =
+    (string "ff"  >> return DoubleFlat)  <|>
+    (string "tqf" >> return TQFlat)      <|>
+    (string "f"   >> return Flat)        <|>
+    (string "qf"  >> return QFlat)       <|>
+    (string "qs"  >> return QSharp)      <|>
+    (string "s"   >> return Sharp)       <|>
+    (string "tqs" >> return TQSharp)     <|>
+    (string "ss"  >> return DoubleSharp) <|>
+    (string ""    >> return Natural) 
+    -- natural has to go at the end because it always succeeds
 
-    let accidentalMap = zip accidentalStrs [DoubleFlat .. DoubleSharp]
-        -- the accidentalName parser would fail before this partial match would
-        Just accidental = lookup accidentalName accidentalMap
-    return accidental
 
 octaveP :: Parser Octave
-octaveP = do
-    string "_"
-    oct <- numP
-    return oct
+octaveP = char '_' >> numP >>= return
 
--- noteP :: Parser Primitive
--- noteP = do
---     pitchClass <- pitchClassP
---     -- for rhythm and octave we need to implemene some kind of state that
---     -- carries these qualities around
---     rhythm <- observing rhythmP
---     oct <- observing octaveP
---     artic <- observing articulationP
---     return $ Note pitchclass 
-
--- Trying to understand the takeP parsers    
--- lP :: Parser Text
--- lP = do
---    -- res <- takeWhileP Nothing (\c -> c == '_') 
---    -- return res
---    res <- try (takeP Nothing 2) >>= takeP Nothing 1
---    return res
+articulationP :: Parser Articulation
+articulationP = 
+    (string "!"  >> return Staccatissimo) <|>
+    (string "."  >> return Staccato)      <|>
+    (string "^"  >> return VAccent)       <|>
+    (string ">"  >> return Accent)        <|>
+    (string "-." >> return Portato)       <|>
+    (string "-"  >> return Tenuto)        <|>
+    (string "+"  >> return LHPizz)        <|>
+    (string ""   >> return None)
+    -- None also goes at the end because it always succeeds
+    

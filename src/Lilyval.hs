@@ -13,16 +13,6 @@ import           Control.Monad.Reader
 import           Prelude hiding (String)
 import           Data.Ratio (Ratio)
 
-
--- data PitchClass = C | Dff | Btqs | Cqs | Dtqf | Bss | Cs | Df | Ctqs 
---                 | Dqf | Css | D | Eff | Dqs | Etqf | Ds | Ef | Fff 
---                 | Dtqs | Eqf | Ftqf | Dss | E | Ff | Eqs | Fqf | Es 
---                 | F | Gff | Etqs | Fqs | Gtqf | Ess | Fs | Gf | Ftqs 
---                 | Gqf | Fss | G | Aff | Gqs | Atqf | Gs | Af | Gtqs | Aqf 
---                 | Gss | A | Bff | Aqs | Btqf | As | Bf | Cff | Atqs | Bqf 
---                 | Ctqf | Ass | B | Cf | Bqs | Cqf | Bs
-
--- This is less disgusting than the above
 data BaseNote = A | B | C | D | E | F | G 
     deriving (Enum, Show)
 
@@ -51,19 +41,20 @@ type Harmonic = Bool
 data Fingering = Fingering Finger Harmonic String
     deriving Show
 
-data Primitive = Note { pitch  :: PitchClass
-                 , dur    :: Dur
-                 , oct    :: Octave
-                 , art    :: [Articulation]
-                 , tempo  :: Tempo
-                 , finger :: Maybe Fingering
-                 , grace  :: Bool
-                 } | 
-            Rest { dur :: Dur
-                 , tempo :: Tempo
-                 , grace  :: Bool
-                 } -- it is possible that the compiler will complain 
-                 -- about records with the same names
+data Primitive = 
+    Note { pitch  :: PitchClass
+         , dur    :: Dur
+         , oct    :: Octave
+         , art    :: Articulation
+         , tempo  :: Tempo
+         , finger :: Maybe Fingering
+         , grace  :: Bool
+         } | 
+    Rest { dur :: Dur
+         , tempo :: Tempo
+         , grace  :: Bool
+         } -- it is possible that the compiler will complain 
+           -- about records with the same names
     deriving Show
 
 data Music = Prim Primitive  |

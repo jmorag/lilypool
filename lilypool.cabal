@@ -22,5 +22,4 @@ executable lilypool
                        megaparsec >= 6.3.0,
                        text >= 1.2.2.2,
                        containers >= 0.5.10.2,
-                       mtl >= 2.2.1,
-                       array >= 0.5.2.0
+                       mtl >= 2.2.1
