@@ -9,18 +9,60 @@ import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import           Data.Text (Text)
 import qualified Data.Text as T
-import           Control.Monad (void)
+import qualified Control.Monad.State as S
 import           Data.Void
 import           Data.Typeable (Typeable)
 import           Data.Data (Data)
 import           Data.Maybe (fromMaybe)
 import           Data.Ratio ((%))
 import qualified Data.Bits as Bits
-import qualified Data.Set as S
+import qualified Data.Set as Set
 
 import Lilyval
 
-type Parser = Parsec CustomError Text
+-- Construct MusicState to keep track of rhythm, tempo, octave, key, etc.
+data MusicState = MusicState { getRhythm :: Dur
+                             , getTempo  :: Tempo
+                             , getOctave :: Octave
+                             , getKey    :: Key
+                             , getTime   :: Time
+                             }
+-- Sensible default state
+defaultState = MusicState { getRhythm = (4 % 4) 
+                          , getTempo = Tempo (4 % 4) 60 --q=60
+                          , getOctave = 4 -- C4 is middle C
+                          , getKey = Key (PitchClass C Natural) Major
+                          , getTime = Time 4 4
+                          }
+
+type MState = S.State MusicState
+
+updateRhythm :: Dur -> MState ()
+updateRhythm newRhythm = do
+    currState <- S.get
+    S.put $ currState { getRhythm = newRhythm }
+
+updateTempo :: Tempo -> MState ()
+updateTempo newTempo = do
+    currState <- S.get
+    S.put $ currState { getTempo = newTempo }
+
+updateOctave :: Octave -> MState ()
+updateOctave newOctave = do
+    currState <- S.get
+    S.put $ currState { getOctave = newOctave }
+
+updateKey :: Key -> MState ()
+updateKey newKey = do
+    currState <- S.get
+    S.put $ currState { getKey = newKey }
+
+updateTime :: Time -> MState ()
+updateTime newTime = do
+    currState <- S.get
+    S.put $ currState { getTime = newTime }
+
+type Parser = ParsecT CustomError Text MState
 
 {- 
  - Many examples taken from 
@@ -35,7 +77,7 @@ instance ShowErrorComponent CustomError where
         "error: " ++ T.unpack msg
 
 errorHelper :: Text -> Parser a
-errorHelper = fancyFailure . S.singleton . ErrorCustom . CustomError
+errorHelper = fancyFailure . Set.singleton . ErrorCustom . CustomError
 
 -- define space consumer
 spaceConsumer :: Parser ()
@@ -139,7 +181,6 @@ accidentalP =
     (string "ss"  >> return DoubleSharp) <|>
     (string ""    >> return Natural) 
     -- natural has to go at the end because it always succeeds
-
 
 octaveP :: Parser Octave
 octaveP = char '_' >> numP >>= return
