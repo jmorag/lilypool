@@ -24,18 +24,19 @@ main = do
   -- parseTest timeP timeTest2
   -- -- parseTest timeP timeTest3
   -- -- parseTest timeP timeTest4
-  parseTest tempoP tempoTest1
-  parseTest tempoP tempoTest2
-  parseTest tempoP tempoTest3
-  parseTest tempoP tempoTest4
+  -- parseTest tempoP tempoTest1
+  -- parseTest tempoP tempoTest2
+  -- parseTest tempoP tempoTest3
+  -- parseTest tempoP tempoTest4
   
   -- parseTest noteP "c4_4"
   -- parseTest lP ""
+  -- runParserT primP "" primTest1
+  -- runParserT primP "" primTest1
   return ()
 
 
 
-lookaheadtest = ","
 keyTest1 = "#key am\n"
 keyTest2 = "#key cM\n"
 keyTest3 = "#key dsm\n"
@@ -51,4 +52,5 @@ tempoTest2 = "#tempo 8=200\n"
 tempoTest3 = "#tempo 16=12\n"
 tempoTest4 = "#tempo 2 = 80\n"
 
-
+primTest1 = "#tempo 4=60\na4_4" :: Text
+primTest2 = "#tempo 4=60\nr4" :: Text

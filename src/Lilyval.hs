@@ -7,7 +7,7 @@ module Lilyval where
 
 import           Data.Typeable (Typeable)
 import qualified Data.Text as T
-import qualified Data.Map as Map
+-- Unsure why reader or exception need to be in this file...
 import           Control.Exception
 import           Control.Monad.Reader
 import           Prelude hiding (String)

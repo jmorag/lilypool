@@ -17,6 +17,7 @@ import           Data.Maybe (fromMaybe)
 import           Data.Ratio ((%))
 import qualified Data.Bits as Bits
 import qualified Data.Set as Set
+import           Prelude hiding (String)
 
 import Lilyval
 
@@ -28,11 +29,11 @@ data MusicState = MusicState { getRhythm :: Dur
                              , getTime   :: Time
                              }
 -- Sensible default state
-defaultState = MusicState { getRhythm = (4 % 4) 
-                          , getTempo = Tempo (4 % 4) 60 --q=60
+defaultState = MusicState { getRhythm = (4 % 4)
+                          , getTempo  = Tempo (4 % 4) 60 --q=60
                           , getOctave = 4 -- C4 is middle C
-                          , getKey = Key (PitchClass C Natural) Major
-                          , getTime = Time 4 4
+                          , getKey    = Key (PitchClass C Natural) Major
+                          , getTime   = Time 4 4
                           }
 
 type MState = S.State MusicState
@@ -112,7 +113,23 @@ powerOfTwoP = do
         isPowerofTwo n = Bits.countLeadingZeros n + Bits.countTrailingZeros n 
                          == Bits.finiteBitSize n - 1
 
+---------------------------------------------------------------------
 {- Begin music parsing -}
+---------------------------------------------------------------------
+{- TODO: refactor the following parsers to update MState
+ - TODO: decide if they should actually return things or not...
+ - The following parsers should deterministically return Parser ~music_thing~
+ - rhythmP
+ - tempoP
+ - octaveP
+ - keyP
+ - timeP
+ - To enforce this behavior, the parsers will look for their respective
+ - characters, and should they find them, return that structure and update the
+ - map. Otherwise, they simply query the map for that state and return it,
+ - leaving the map unchanged
+ -}
+
 -- Parse the reserved time, key, and tempo symbols
 keyP :: Parser Key
 keyP = do 
@@ -120,22 +137,26 @@ keyP = do
     pitchClass <- pitchClassP
     quality <- qualityP
     spaceConsumer >> eol
-    return $ Key pitchClass quality
+    let result = Key pitchClass quality
+    S.lift $ updateKey result
+    return result 
+    where 
+        -- qualityP :: Parser Quality
+        qualityP = (char 'm' >> return Minor) <|> (char 'M' >> return Major)
 
-qualityP :: Parser Quality
-qualityP = (char 'm' >> return Minor) <|> (char 'M' >> return Major)
-
-timeP :: Parser Time
+timeP :: Parser Time -- possibly Parser ()
 timeP = do
     symbol "#time"
     numerator <- numP
     char '/'
     -- We only accept powers of two as denominators
     denominator <- powerOfTwoP
-    eol
-    return $ Time numerator denominator
+    spaceConsumer >> eol
+    let result = Time numerator denominator
+    S.lift $ updateTime result
+    return result 
 
-tempoP :: Parser Tempo
+tempoP :: Parser Tempo -- possibly Parser ()
 tempoP = do 
     symbol "#tempo"
     noteLength <- rhythmP
@@ -143,15 +164,40 @@ tempoP = do
     symbol "="
     bpm <- numP
     spaceConsumer >> eol
-    return $ Tempo noteLength bpm
+    let result = Tempo noteLength bpm
+    S.lift $ updateTempo result
+    return result 
 
+-- This is where it gets more interesting
+-- rhythmP looks like a textbook example of why the Maybe monad exists...
+-- this is a good sign that we should use that
 rhythmP :: Parser Dur
 rhythmP = do
-    baseLength <- powerOfTwoP
-    isDotted <- optional (char ',')
-    return $ case isDotted of
-        Nothing -> (1 % baseLength)
-        Just ',' -> (3 % (baseLength * 2))
+    baseLength <- optional powerOfTwoP
+    case baseLength of
+        Nothing -> S.lift S.get >>= return . getRhythm
+        Just bl -> do
+            isDotted <- optional (char ',')
+            case isDotted of
+                Nothing -> do
+                    let result = (1 % bl)
+                    S.lift $ updateRhythm result
+                    return result
+                Just ',' -> do
+                    let result = (3 % (bl * 2))
+                    S.lift $ updateRhythm result
+                    return result
+
+-- Not as bad a design pattern as rhythmP, but still not ideal
+octaveP :: Parser Octave
+octaveP = do
+    indicator <- optional (char '_')
+    case indicator of
+        Nothing -> S.lift S.get >>= return . getOctave
+        Just '_' -> do
+            oct <- numP
+            S.lift $ updateOctave oct
+            return oct
 
 pitchClassP :: Parser PitchClass
 pitchClassP = do
@@ -161,12 +207,9 @@ pitchClassP = do
 
 baseNoteP :: Parser BaseNote
 baseNoteP =
-    (string "a" >> return A) <|>
-    (string "b" >> return B) <|>
-    (string "c" >> return C) <|>
-    (string "d" >> return D) <|>
-    (string "e" >> return E) <|>
-    (string "f" >> return F) <|>
+    (string "a" >> return A) <|> (string "b" >> return B) <|>
+    (string "c" >> return C) <|> (string "d" >> return D) <|>
+    (string "e" >> return E) <|> (string "f" >> return F) <|>
     (string "g" >> return G)
 
 accidentalP :: Parser Accidental
@@ -182,9 +225,8 @@ accidentalP =
     (string ""    >> return Natural) 
     -- natural has to go at the end because it always succeeds
 
-octaveP :: Parser Octave
-octaveP = char '_' >> numP >>= return
 
+-- We only support one articulation per note
 articulationP :: Parser Articulation
 articulationP = 
     (string "!"  >> return Staccatissimo) <|>
@@ -194,6 +236,25 @@ articulationP =
     (string "-." >> return Portato)       <|>
     (string "-"  >> return Tenuto)        <|>
     (string "+"  >> return LHPizz)        <|>
-    (string ""   >> return None)
     -- None also goes at the end because it always succeeds
+    (string ""   >> return None)
     
+restP :: Parser Primitive
+restP = do
+    char 'r'
+    length <- rhythmP
+    tempo <- S.lift S.get >>= return . getTempo
+    return $ Rest length tempo False -- deal with grace notes later
+
+noteP :: Parser Primitive
+noteP = do
+    pc <- pitchClassP
+    length <- rhythmP
+    oct <- octaveP
+    art <- articulationP
+    tempo <- S.lift S.get >>= return . getTempo
+    -- fingerings and grace notes not implemented for now
+    return $ Note pc length oct art tempo Nothing False
+
+primP :: Parser Primitive
+primP = try restP <|> noteP 
