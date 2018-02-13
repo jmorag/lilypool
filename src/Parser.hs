@@ -139,7 +139,7 @@ powerOfTwoP = do
  -}
 
 -- Parse the reserved time, key, and tempo symbols
-keyP :: Parser Key
+keyP :: Parser ()
 keyP = do 
     symbol "#key"
     pitchClass <- pitchClassP
@@ -147,12 +147,11 @@ keyP = do
     spaceConsumer >> eol
     let result = Key pitchClass quality
     S.lift $ updateKey result
-    return result 
+    return ()
     where 
-        -- qualityP :: Parser Quality
         qualityP = (char 'm' >> return Minor) <|> (char 'M' >> return Major)
 
-timeP :: Parser Time -- possibly Parser ()
+timeP :: Parser ()
 timeP = do
     symbol "#time"
     numerator <- numP
@@ -162,9 +161,9 @@ timeP = do
     spaceConsumer >> eol
     let result = Time numerator denominator
     S.lift $ updateTime result
-    return result 
+    return ()
 
-tempoP :: Parser Tempo -- possibly Parser ()
+tempoP :: Parser ()
 tempoP = do 
     symbol "#tempo"
     noteLength <- rhythmP
@@ -174,7 +173,7 @@ tempoP = do
     spaceConsumer >> eol
     let result = Tempo noteLength bpm
     S.lift $ updateTempo result
-    return result 
+    return ()
 
 -- This is where it gets more interesting
 -- rhythmP looks like a textbook example of why the Maybe monad exists...
@@ -357,24 +356,21 @@ verifyMeasure music length = accum music 0 == length
         Polyphony mss -> sum $ map (\m -> accum m beats) (head mss)
 
 
--- This parses one line of music
-lineP :: Parser Music
-lineP = 
-    -- Try to parse control structures: time, key, or tempo
-    -- these update state, so we don't need to bind them to anything
-        (try tempoP >>= return . musZero) <|>
-        (try timeP  >> S.lift S.get >>= return . musZero . getTempo) <|>
-        (try keyP   >> S.lift S.get >>= return . musZero . getTempo) <|>
-        (measureP   >>= return)
-    -- TODO
-    -- fingering <- fingeringP
+-- -- This parses one line of music
+-- lineP :: Parser Music
+-- lineP = 
+--     -- Try to parse control structures: time, key, or tempo
+--     -- these update state, so we don't need to bind them to anything
+--         (try tempoP >>= return . musZero) <|>
+--         (try timeP  >> S.lift S.get >>= return . musZero . getTempo) <|>
+--         (try keyP   >> S.lift S.get >>= return . musZero . getTempo) <|>
+--         (measureP   >>= return)
+--     -- TODO
+--     -- fingering <- fingeringP
 
--- Null musical unit
+-- Null musical unit: returning this is a hack, and I don't want to do it,
+-- but we'll keep it in case it becomes necessary for something else
 musZero :: Tempo -> Music
 musZero tempo = Unit $ Rest 0 tempo False
-
-
--- Parse an entire file
--- fileP :: Parser Music
             
     
