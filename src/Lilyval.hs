@@ -57,7 +57,7 @@ data Primitive =
            -- about records with the same names
     deriving Show
 
-data Music = Prim Primitive  |
+data Music = Unit Primitive  |
              Music :+: Music | -- notes under a slur
              Music :=: Music | -- notes in a chord
              Passage [Music] | -- a passage 

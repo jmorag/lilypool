@@ -9,6 +9,7 @@ import           Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import           Data.Text (Text)
 import qualified Data.Text as T
+import           Control.Monad.Identity
 import qualified Control.Monad.State as S
 import           Data.Void
 import           Data.Typeable (Typeable)
@@ -22,18 +23,20 @@ import           Prelude hiding (String)
 import Lilyval
 
 -- Construct MusicState to keep track of rhythm, tempo, octave, key, etc.
-data MusicState = MusicState { getRhythm :: Dur
-                             , getTempo  :: Tempo
-                             , getOctave :: Octave
-                             , getKey    :: Key
-                             , getTime   :: Time
-                             }
+data MusicState = MusicState { getRhythm  :: Dur
+                             , getTempo   :: Tempo
+                             , getOctave  :: Octave
+                             , getKey     :: Key
+                             , getTime    :: Time
+                             , getString  :: String
+                             } deriving (Show)
 -- Sensible default state
-defaultState = MusicState { getRhythm = (4 % 4)
-                          , getTempo  = Tempo (4 % 4) 60 --q=60
-                          , getOctave = 4 -- C4 is middle C
-                          , getKey    = Key (PitchClass C Natural) Major
-                          , getTime   = Time 4 4
+defaultState = MusicState { getRhythm  = (1 % 4)
+                          , getTempo   = Tempo (4 % 4) 60 --q=60
+                          , getOctave  = 4 -- C4 is middle C
+                          , getKey     = Key (PitchClass C Natural) Major
+                          , getTime    = Time 4 4
+                          , getString  = II
                           }
 
 type MState = S.State MusicState
@@ -63,7 +66,12 @@ updateTime newTime = do
     currState <- S.get
     S.put $ currState { getTime = newTime }
 
-type Parser = ParsecT CustomError Text MState
+updateString :: String -> MState ()
+updateString newString = do
+    currState <- S.get
+    S.put $ currState { getString = newString }
+
+type Parser = ParsecT CustomError Text MState 
 
 {- 
  - Many examples taken from 
@@ -244,6 +252,7 @@ restP = do
     char 'r'
     length <- rhythmP
     tempo <- S.lift S.get >>= return . getTempo
+    spaceConsumer
     return $ Rest length tempo False -- deal with grace notes later
 
 noteP :: Parser Primitive
@@ -253,8 +262,119 @@ noteP = do
     oct <- octaveP
     art <- articulationP
     tempo <- S.lift S.get >>= return . getTempo
+    spaceConsumer
     -- fingerings and grace notes not implemented for now
     return $ Note pc length oct art tempo Nothing False
 
-primP :: Parser Primitive
-primP = try restP <|> noteP 
+unitP :: Parser Music
+unitP = do
+    result <- (try restP) <|> noteP
+    return $! Unit result
+
+stringP :: Parser String
+stringP = do
+    stringNum <- optional $ 
+        (string "1" >> return I)   <|>
+        (string "2" >> return II)  <|>
+        (string "3" >> return III) <|>
+        (string "4" >> return IV)
+    case stringNum of
+        Nothing -> spaceConsumer >> S.lift S.get >>= return . getString
+        Just s -> do
+            S.lift $ updateString s
+            spaceConsumer
+            return s
+
+fingerP :: Parser Finger
+fingerP = (string "0" >> return Open)  <|>
+          (string "1" >> return One)   <|>
+          (string "2" >> return Two)   <|>
+          (string "3" >> return Three) <|>
+          (string "4" >> return Four)
+
+harmonicP :: Parser Harmonic
+harmonicP = do
+    isHarmonic <- optional (char 'o')
+    case isHarmonic of
+        Just 'o' -> return True
+        Nothing  -> return False
+
+fingeringP :: Parser (Maybe Fingering)
+fingeringP = do
+    notGiven <- optional (char '_')
+    case notGiven of
+        Just '_' -> spaceConsumer >> return Nothing
+        Nothing -> do
+            finger <- fingerP
+            harmonic <- harmonicP
+            string <- stringP
+            return $ Just $ Fingering finger harmonic string
+
+    
+-- basic parser for a single measure
+-- no slurs, chords, polyphony, or grace notes yet
+measureP :: Parser Music
+measureP = do
+    notes <- some unitP
+    eol
+    fingerings <- some fingeringP
+    eol
+    case fingerings of
+        [Nothing] -> do
+            let measure = Passage notes
+            Time num den <- S.lift S.get >>= return . getTime
+            if verifyMeasure measure (num % den) then
+                return $ measure
+            else errorHelper 
+                "The value of the notes in \
+                \ this measure do not match the time signature"
+        fs -> if length fs /= length notes then 
+                 errorHelper "Unequal numbers of fingers and notes given" else 
+                 do let prims = map (\(Unit p) -> p) notes
+                        measure = Passage . map Unit $ zipWith 
+                          (\note fingering -> note { finger = fingering}) prims fs
+                    Time num den <- S.lift S.get >>= return . getTime
+                    if verifyMeasure measure (num % den) then
+                       return $ measure
+                    else errorHelper 
+                       "The value of the notes in \
+                        \ this measure do not match the time signature"
+
+
+-- this will need significant refactoring later to include errors with line
+-- numbers and specific problems. Also, in the cases of chords and polyphony,
+-- it currently assumes that every note in the chord is the same length and
+-- that every voice in the polyphony has the same duration, which could
+-- certainly not be the case
+verifyMeasure :: Music -> Dur -> Bool
+verifyMeasure music length = accum music 0 == length
+    where
+    accum music beats = case music of
+        Unit prim -> if grace prim then beats else dur prim + beats
+        m1 :+: m2 -> accum m1 beats + accum m2 beats -- slur
+        m1 :=: m2 -> accum m1 beats -- chord
+        Passage ms -> sum $ map (\m -> accum m beats) ms
+        Polyphony mss -> sum $ map (\m -> accum m beats) (head mss)
+
+
+-- This parses one line of music
+lineP :: Parser Music
+lineP = 
+    -- Try to parse control structures: time, key, or tempo
+    -- these update state, so we don't need to bind them to anything
+        (try tempoP >>= return . musZero) <|>
+        (try timeP  >> S.lift S.get >>= return . musZero . getTempo) <|>
+        (try keyP   >> S.lift S.get >>= return . musZero . getTempo) <|>
+        (measureP   >>= return)
+    -- TODO
+    -- fingering <- fingeringP
+
+-- Null musical unit
+musZero :: Tempo -> Music
+musZero tempo = Unit $ Rest 0 tempo False
+
+
+-- Parse an entire file
+-- fileP :: Parser Music
+            
+    

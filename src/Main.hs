@@ -9,6 +9,8 @@ import           Data.Text (Text)
 import qualified Data.Text as T
 import Control.Monad (void, foldM)
 import Data.Void
+import qualified Control.Monad.State as S
+import           Control.Monad.Trans
 
 import Lilyval
 import Parser
@@ -31,8 +33,7 @@ main = do
   
   -- parseTest noteP "c4_4"
   -- parseTest lP ""
-  -- runParserT primP "" primTest1
-  -- runParserT primP "" primTest1
+  print $ S.runStateT (runParserT unitP "" primTest1) defaultState
   return ()
 
 
