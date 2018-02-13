@@ -13,6 +13,7 @@ import           Control.Monad.Identity
 import qualified Control.Monad.State as S
 import           Data.Void
 import           Data.Typeable (Typeable)
+import           Data.Either (rights)
 import           Data.Data (Data)
 import           Data.Maybe (fromMaybe)
 import           Data.Ratio ((%))
@@ -356,21 +357,18 @@ verifyMeasure music length = accum music 0 == length
         Polyphony mss -> sum $ map (\m -> accum m beats) (head mss)
 
 
--- -- This parses one line of music
--- lineP :: Parser Music
--- lineP = 
---     -- Try to parse control structures: time, key, or tempo
---     -- these update state, so we don't need to bind them to anything
---         (try tempoP >>= return . musZero) <|>
---         (try timeP  >> S.lift S.get >>= return . musZero . getTempo) <|>
---         (try keyP   >> S.lift S.get >>= return . musZero . getTempo) <|>
---         (measureP   >>= return)
---     -- TODO
---     -- fingering <- fingeringP
+-- This parses one line of music
+lineP :: Parser (Either () Music)
+lineP = (try keyP   >>= return . Left) <|>
+        (try tempoP >>= return . Left) <|>
+        (try timeP  >>= return . Left) <|>
+        (measureP   >>= return . Right)
 
 -- Null musical unit: returning this is a hack, and I don't want to do it,
 -- but we'll keep it in case it becomes necessary for something else
 musZero :: Tempo -> Music
 musZero tempo = Unit $ Rest 0 tempo False
             
-    
+-- This should parse a whole file
+fileP :: Parser Music
+fileP = some lineP >>= return . Passage . rights
