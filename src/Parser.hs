@@ -371,4 +371,8 @@ musZero tempo = Unit $ Rest 0 tempo False
             
 -- This should parse a whole file
 fileP :: Parser Music
-fileP = some lineP >>= return . Passage . rights
+fileP = do  
+    spaceConsumer >> eol
+    lines <- some (lexeme lineP)
+    space >> eof
+    return . Passage $ rights lines

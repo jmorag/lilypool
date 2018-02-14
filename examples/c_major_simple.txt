@@ -1,0 +1,32 @@
+% This is a C major scale
+#time 8/8
+#key am
+c4_4 b_3 c_4 d
+24    1   2   3
+e f  g a
+4  13 2 3
+b c_5 d e
+_
+f g a b
+_
+c_6 d e f
+_
+g a b c_7
+_
+c b_6 a g
+_
+f e d c 
+_
+b_5 a g f
+_
+e d c b_4
+_
+a g f e
+_
+d c b_3 d_4
+_
+c1
+_
+
+
+

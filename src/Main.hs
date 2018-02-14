@@ -7,6 +7,7 @@ import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
 import           Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.IO as T
 import Control.Monad (void, foldM)
 import Data.Void
 import qualified Control.Monad.State as S
@@ -17,24 +18,10 @@ import Parser
 
 main :: IO ()
 main = do
-
-  -- parseTest keyP keyTest1
-  -- parseTest keyP keyTest2
-  -- parseTest keyP keyTest3
-  -- -- parseTest keyP keyTest4
-  -- parseTest timeP timeTest1
-  -- parseTest timeP timeTest2
-  -- -- parseTest timeP timeTest3
-  -- -- parseTest timeP timeTest4
-  -- parseTest tempoP tempoTest1
-  -- parseTest tempoP tempoTest2
-  -- parseTest tempoP tempoTest3
-  -- parseTest tempoP tempoTest4
-  
-  -- parseTest noteP "c4_4"
-  -- parseTest lP ""
-  print $ S.runStateT (runParserT unitP "" primTest1) defaultState
-  return ()
+  cmajor <- T.readFile "./examples/c_major_simple.txt"
+  print $ S.runStateT 
+            (runParserT fileP "./examples/c_major_simple.txt" cmajor) defaultState
+  -- print $ S.runStateT (runParserT fileP "" "#key fsm\n%#time 5/4\n") defaultState
 
 
 
