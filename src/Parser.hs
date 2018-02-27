@@ -360,6 +360,7 @@ measureP = do
 verifyMeasure :: Music -> Dur -> Bool
 verifyMeasure music nBeats = accum music == nBeats
     where
+    accum [] = 0 % 1
     accum (m:ms) = case m of
         N note           -> (dur $ nlen note) + accum ms
         DStop note _     -> (dur $ nlen note) + accum ms
