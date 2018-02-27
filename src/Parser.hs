@@ -18,7 +18,7 @@ import           Data.Data (Data)
 import           Data.Maybe (fromMaybe)
 import           Data.Ratio ((%))
 import qualified Data.Bits as Bits
-import qualified Data.Set as Set
+-- import qualified Data.Set as Set
 import           Prelude hiding (String)
 
 import Lilyval

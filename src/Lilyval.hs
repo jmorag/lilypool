@@ -41,30 +41,21 @@ type Harmonic = Bool
 data Fingering = Fingering Finger Harmonic String
     deriving Show
 
-data Primitive = 
-    Note { pitch  :: PitchClass
-         , dur    :: Dur
-         , oct    :: Octave
-         , art    :: Articulation
-         , tempo  :: Tempo
-         , finger :: Maybe Fingering
-         , grace  :: Bool
-         } | 
-    Rest { dur :: Dur
-         , tempo :: Tempo
-         , grace  :: Bool
-         } -- it is possible that the compiler will complain 
-           -- about records with the same names
-    deriving Show
-
-data Music = Unit Primitive  |
-             Music :+: Music | -- notes under a slur
-             Music :=: Music | -- notes in a chord
-             Passage [Music] | -- a passage 
-             Polyphony [[Music]] -- arbitrary polyphony
-    deriving Show
--- (possibly consider using Sequence instead of List for passage)
-
+-- data Primitive = 
+--     Note { pitch  :: PitchClass
+--          , dur    :: Dur
+--          , oct    :: Octave
+--          , art    :: Articulation
+--          , tempo  :: Tempo
+--          , finger :: Maybe Fingering
+--          , grace  :: Bool
+--          } | 
+--     Rest { dur :: Dur
+--          , tempo :: Tempo
+--          , grace  :: Bool
+--          } -- it is possible that the compiler will complain 
+--            -- about records with the same names
+--     deriving Show
 
 -- Speical annotations
 data Quality = Major | Minor
@@ -76,4 +67,24 @@ data Time    = Time Int Int
     deriving Show
 data Tempo   = Tempo Dur Int
     deriving Show
+
+data Pitch  = Pitch PitchClass Octave deriving Show
+data Length = Length Dur Tempo deriving Show
+
+data Rest = Rest Length deriving Show
+data Note = Note { pitch  :: Pitch
+                 , length :: Length
+                 , art    :: Articulation
+                 , finger :: Maybe Fingering
+                 } deriving Show
+
+data MusicUnit = N Note  |
+                 DStop Note Note |
+                 TStop Note Note Note |
+                 QStop Note Note Note Note |
+                 R Rest
+    deriving Show
+
+type Music = [MusicUnit]
+
 
