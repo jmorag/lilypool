@@ -69,11 +69,11 @@ data Tempo   = Tempo Dur Int
     deriving Show
 
 data Pitch  = Pitch PitchClass Octave deriving Show
-data Length = Length Dur Tempo deriving Show
+data Length = Length { dur :: Dur, tempo :: Tempo } deriving Show
 
-data Rest = Rest Length deriving Show
+data Rest = Rest { rlen :: Length } deriving Show
 data Note = Note { pitch  :: Pitch
-                 , length :: Length
+                 , nlen   :: Length
                  , art    :: Articulation
                  , finger :: Maybe Fingering
                  } deriving Show

@@ -18,26 +18,35 @@ import           Data.Data (Data)
 import           Data.Maybe (fromMaybe)
 import           Data.Ratio ((%))
 import qualified Data.Bits as Bits
--- import qualified Data.Set as Set
+import qualified Data.Set as Set
 import           Prelude hiding (String)
 
 import Lilyval
 
--- Construct MusicState to keep track of rhythm, tempo, octave, key, etc.
-data MusicState = MusicState { getRhythm  :: Dur
-                             , getTempo   :: Tempo
-                             , getOctave  :: Octave
-                             , getKey     :: Key
-                             , getTime    :: Time
-                             , getString  :: String
+-- Construct MusicState to keep track of rhythm, tempo, octave, key, grace
+-- status, and slurs
+-- Grace note status is something that we have in order to verify correct
+-- number of beats in a bar. How we use it to eventually apply time stamps to
+-- everything is TBD
+data MusicState = MusicState { getRhythm    :: Dur
+                             , getTempo     :: Tempo
+                             , getOctave    :: Octave
+                             , getKey       :: Key
+                             , getTime      :: Time
+                             , getString    :: String
+                             , getGrace     :: Bool
+                             , getBowChange :: Bool
                              } deriving (Show)
+
 -- Sensible default state
-defaultState = MusicState { getRhythm  = (1 % 4)
-                          , getTempo   = Tempo (4 % 4) 60 --q=60
-                          , getOctave  = 4 -- C4 is middle C
-                          , getKey     = Key (PitchClass C Natural) Major
-                          , getTime    = Time 4 4
-                          , getString  = II
+defaultState = MusicState { getRhythm    = (1 % 4)
+                          , getTempo     = Tempo (4 % 4) 60 --q=60
+                          , getOctave    = 4 -- C4 is middle C
+                          , getKey       = Key (PitchClass C Natural) Major
+                          , getTime      = Time 4 4
+                          , getString    = II
+                          , getGrace     = False -- not a grace note
+                          , getBowChange = True -- no slur
                           }
 
 type MState = S.State MusicState
@@ -71,6 +80,17 @@ updateString :: String -> MState ()
 updateString newString = do
     currState <- S.get
     S.put $ currState { getString = newString }
+
+updateGrace :: MState ()
+updateGrace = do
+    currState <- S.get
+    S.put $ currState { getGrace = not (getGrace currState) }
+
+updateBow :: MState ()
+updateBow = do
+    currState <- S.get
+    S.put $ currState { getBowChange = not (getBowChange currState) }
+    
 
 type Parser = ParsecT CustomError Text MState 
 
@@ -125,19 +145,6 @@ powerOfTwoP = do
 ---------------------------------------------------------------------
 {- Begin music parsing -}
 ---------------------------------------------------------------------
-{- TODO: refactor the following parsers to update MState
- - TODO: decide if they should actually return things or not...
- - The following parsers should deterministically return Parser ~music_thing~
- - rhythmP
- - tempoP
- - octaveP
- - keyP
- - timeP
- - To enforce this behavior, the parsers will look for their respective
- - characters, and should they find them, return that structure and update the
- - map. Otherwise, they simply query the map for that state and return it,
- - leaving the map unchanged
- -}
 
 -- Parse the reserved time, key, and tempo symbols
 keyP :: Parser ()
@@ -247,29 +254,28 @@ articulationP =
     -- None also goes at the end because it always succeeds
     (string ""   >> return None)
     
-restP :: Parser Primitive
+restP :: Parser Rest
 restP = do
     char 'r'
-    length <- rhythmP
+    dur <- rhythmP
     tempo <- S.lift S.get >>= return . getTempo
     spaceConsumer
-    return $ Rest length tempo False -- deal with grace notes later
+    return $ Rest (Length dur tempo)
 
-noteP :: Parser Primitive
+noteP :: Parser Note
 noteP = do
     pc <- pitchClassP
-    length <- rhythmP
+    dur <- rhythmP
     oct <- octaveP
     art <- articulationP
     tempo <- S.lift S.get >>= return . getTempo
     spaceConsumer
-    -- fingerings and grace notes not implemented for now
-    return $ Note pc length oct art tempo Nothing False
+    return $ Note (Pitch pc oct) (Length dur tempo) art Nothing
 
-unitP :: Parser Music
-unitP = do
-    result <- (try restP) <|> noteP
-    return $! Unit result
+unitP :: Parser MusicUnit
+unitP =
+    (try restP >>= return . R) <|> (noteP >>= return . N)
+    -- implement chords later
 
 stringP :: Parser String
 stringP = do
@@ -321,18 +327,23 @@ measureP = do
     eol
     case fingerings of
         [Nothing] -> do
-            let measure = Passage notes
+            let measure = notes
             Time num den <- S.lift S.get >>= return . getTime
             if verifyMeasure measure (num % den) then
                 return $ measure
             else errorHelper 
                 "The value of the notes in \
                 \ this measure do not match the time signature"
+
         fs -> if length fs /= length notes then 
                  errorHelper "Unequal numbers of fingers and notes given" else 
-                 do let prims = map (\(Unit p) -> p) notes
-                        measure = Passage . map Unit $ zipWith 
-                          (\note fingering -> note { finger = fingering}) prims fs
+
+                 do 
+                    let go note fingering = case note of 
+                                   N n -> N $ n { finger = fingering }
+                                   _ -> note
+                    let measure = zipWith go notes fs
+
                     Time num den <- S.lift S.get >>= return . getTime
                     if verifyMeasure measure (num % den) then
                        return $ measure
@@ -347,15 +358,14 @@ measureP = do
 -- that every voice in the polyphony has the same duration, which could
 -- certainly not be the case
 verifyMeasure :: Music -> Dur -> Bool
-verifyMeasure music length = accum music 0 == length
+verifyMeasure music nBeats = accum music == nBeats
     where
-    accum music beats = case music of
-        Unit prim -> if grace prim then beats else dur prim + beats
-        m1 :+: m2 -> accum m1 beats + accum m2 beats -- slur
-        m1 :=: m2 -> accum m1 beats -- chord
-        Passage ms -> sum $ map (\m -> accum m beats) ms
-        Polyphony mss -> sum $ map (\m -> accum m beats) (head mss)
-
+    accum (m:ms) = case m of
+        N note           -> (dur $ nlen note) + accum ms
+        DStop note _     -> (dur $ nlen note) + accum ms
+        TStop note _ _   -> (dur $ nlen note) + accum ms
+        QStop note _ _ _ -> (dur $ nlen note) + accum ms
+        R rest           -> (dur $ rlen rest) + accum ms
 
 -- This parses one line of music
 lineP :: Parser (Either () Music)
@@ -366,8 +376,8 @@ lineP = (try keyP   >>= return . Left) <|>
 
 -- Null musical unit: returning this is a hack, and I don't want to do it,
 -- but we'll keep it in case it becomes necessary for something else
-musZero :: Tempo -> Music
-musZero tempo = Unit $ Rest 0 tempo False
+musZero :: Tempo -> MusicUnit
+musZero tempo = R . Rest $ Length 0 tempo
             
 -- This should parse a whole file
 fileP :: Parser Music
@@ -375,4 +385,4 @@ fileP = do
     spaceConsumer >> eol
     lines <- some (lexeme lineP)
     space >> eof
-    return . Passage $ rights lines
+    return . concat $ rights lines
