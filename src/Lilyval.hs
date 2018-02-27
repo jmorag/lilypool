@@ -41,22 +41,6 @@ type Harmonic = Bool
 data Fingering = Fingering Finger Harmonic String
     deriving Show
 
--- data Primitive = 
---     Note { pitch  :: PitchClass
---          , dur    :: Dur
---          , oct    :: Octave
---          , art    :: Articulation
---          , tempo  :: Tempo
---          , finger :: Maybe Fingering
---          , grace  :: Bool
---          } | 
---     Rest { dur :: Dur
---          , tempo :: Tempo
---          , grace  :: Bool
---          } -- it is possible that the compiler will complain 
---            -- about records with the same names
---     deriving Show
-
 -- Speical annotations
 data Quality = Major | Minor
     deriving Show
@@ -86,5 +70,3 @@ data MusicUnit = N Note  |
     deriving Show
 
 type Music = [MusicUnit]
-
-

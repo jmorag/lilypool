@@ -324,7 +324,7 @@ measureP = do
     notes <- some unitP
     eol
     fingerings <- some fingeringP
-    eol
+    some eol
     case fingerings of
         [Nothing] -> do
             let measure = notes
