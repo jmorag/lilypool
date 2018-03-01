@@ -274,8 +274,17 @@ noteP = do
 
 unitP :: Parser MusicUnit
 unitP =
-    (try restP >>= return . R) <|> (noteP >>= return . N)
-    -- implement chords later
+    (try restP >>= return . R) <|> (try noteP >>= return . N) <|>
+    -- parse chords
+    do
+        notes <- between (symbol "[") (symbol "]") (some noteP)
+        case notes of
+            [_] -> errorHelper "Don't write singleton chords"
+            [n1, n2] -> return $ DStop n1 n2 
+            [n1, n2, n3] -> return $ TStop n1 n2 n3
+            [n1, n2, n3, n4] -> return $ QStop n1 n2 n3 n4
+            _ -> errorHelper "Too many notes in chord"
+
 
 stringP :: Parser String
 stringP = do
@@ -324,7 +333,7 @@ measureP = do
     notes <- some unitP
     eol
     fingerings <- some fingeringP
-    some eol
+    some eol >> spaceConsumer
     case fingerings of
         [Nothing] -> do
             let measure = notes
@@ -377,8 +386,8 @@ lineP = (try keyP   >>= return . Left) <|>
 
 -- Null musical unit: returning this is a hack, and I don't want to do it,
 -- but we'll keep it in case it becomes necessary for something else
-musZero :: Tempo -> MusicUnit
-musZero tempo = R . Rest $ Length 0 tempo
+musZero :: MusicUnit
+musZero = R . Rest $ Length 0 (Tempo (4%4) 60)
             
 -- This should parse a whole file
 fileP :: Parser Music
