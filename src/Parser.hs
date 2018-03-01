@@ -344,13 +344,20 @@ measureP = do
                 "The value of the notes in \
                 \ this measure do not match the time signature"
 
-        fs -> if length fs /= length notes then 
+        fs -> let count [] = 0
+                  count (n:ns) = case n of
+                      N _ -> 1 + count ns
+                      DStop _ _ -> 2 + count ns
+                      TStop _ _ _ -> 3 + count ns
+                      QStop _ _ _ _  -> 4 + count ns
+              in 
+                 if length fs /= count notes then 
                  errorHelper "Unequal numbers of fingers and notes given" else 
 
                  do 
                     let go note fingering = case note of 
-                                   N n -> N $ n { finger = fingering }
-                                   _ -> note
+                           N n -> N $ n { finger = fingering }
+                           _ -> note
                     let measure = zipWith go notes fs
 
                     Time num den <- S.lift S.get >>= return . getTime
