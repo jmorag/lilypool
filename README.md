@@ -1,4 +1,6 @@
 # Lilypool
+## NOTE: this branch has the old Lilyval architecture. It is being kept here
+for posterity, in case I horribly destroy something in master.
 ## Introduction
 An implementation of a subset of lilypond music notation for use in the autofinger project (name still under review).
 
