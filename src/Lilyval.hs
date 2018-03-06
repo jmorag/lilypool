@@ -53,21 +53,21 @@ data Tempo   = Tempo Dur Int
 
 
 data Pitch  = Pitch PitchClass Octave
-data Length = Length { dur :: Dur, tempo :: Tempo } deriving Show
+data Length = Length { dur :: Dur, tempo :: Tempo }
 
-data Rest = Rest { rlen :: Length } deriving Show
+data Rest = Rest { rlen :: Length }
 data Note = Note { pitch  :: Pitch
                  , nlen   :: Length
                  , art    :: Articulation
                  , finger :: Maybe Fingering
-                 } deriving Show
+                 }
 
 data MusicUnit = N Note  |
                  DStop Note Note |
                  TStop Note Note Note |
                  QStop Note Note Note Note |
-                 R Rest
-    deriving Show
+                 R Rest 
+                 deriving Show
 
 type Music = [MusicUnit]
 
@@ -88,3 +88,16 @@ instance Show Tempo where
 
 instance Show Pitch where
     show (Pitch pc oct) = show pc ++ "_" ++ show oct
+
+instance Show Length where
+    show l = show (dur l) ++ " at " ++ show (tempo l)
+
+instance Show Rest where
+    show r = "r" ++ show (rlen r)
+
+instance Show Note where
+    show n = show (pitch n) ++ " " ++ 
+             show (nlen n) ++ " " ++
+             show (art n) ++ " " ++
+             show (finger n) ++ "\n"
+    

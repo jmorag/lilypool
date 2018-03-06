@@ -19,7 +19,7 @@ import Parser
 main :: IO ()
 main = do
   cmajor <- T.readFile "./examples/c_major_simple.txt"
-  print $ S.runStateT 
+  print $ S.evalStateT 
             (runParserT fileP "./examples/c_major_simple.txt" cmajor) defaultState
   -- print $ S.runStateT (runParserT fileP "" "#key fsm\n%#time 5/4\n") defaultState
 
